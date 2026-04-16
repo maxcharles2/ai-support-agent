@@ -1,4 +1,4 @@
-import { streamText } from "ai";
+import { streamText, convertToModelMessages } from "ai";
 import { resolveModel } from "@/lib/models";
 
 export async function POST(req: Request) {
@@ -7,7 +7,7 @@ export async function POST(req: Request) {
         const result = streamText({
             model: resolveModel(modelId),
             system: "You are a helpful AI support assistant. Answer questions clearly and concisely.",
-            messages,
+            messages: await convertToModelMessages(messages),
         });
         return result.toUIMessageStreamResponse();
     } catch (error) {
