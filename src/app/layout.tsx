@@ -13,9 +13,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "AI Support Agent",
+  title: "AI Support Agent — Evaluation Playground",
   description:
-    "Side-by-side AI support agent evaluation using AI SDK structured output and LangSmith tracing.",
+    "Compare AI SDK structured output evaluation and LangSmith traced evaluation side-by-side with a multi-model AI support agent.",
 };
 
 export default function RootLayout({
