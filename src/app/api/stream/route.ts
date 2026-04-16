@@ -1,12 +1,13 @@
-import { streamText } from "ai";
-import { openai } from "@ai-sdk/openai";
+import { streamText, convertToModelMessages } from "ai";
+import { resolveModel } from "@/lib/models";
 
 export async function POST(req: Request) {
     try {
-        const { prompt } = await req.json();
+        const { messages, modelId } = await req.json();
         const result = streamText({
-            model: openai("gpt-4.1-nano"),
-            prompt,
+            model: resolveModel(modelId),
+            system: "You are a helpful AI support assistant. Answer questions clearly and concisely.",
+            messages: await convertToModelMessages(messages),
         });
         return result.toUIMessageStreamResponse();
     } catch (error) {
