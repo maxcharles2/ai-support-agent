@@ -2,7 +2,7 @@
 
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, UIMessage } from "ai";
-import { useState, useRef, useMemo } from "react";
+import { useState, useRef, useMemo, useEffect } from "react";
 import Link from "next/link";
 import { MODELS } from "@/lib/models";
 
@@ -11,6 +11,7 @@ interface EvaluationResult {
   strengths: string;
   weaknesses: string;
   summary: string;
+  langsmithUrl?: string;
 }
 
 type EvalState =
@@ -26,20 +27,32 @@ function getMessageText(message: UIMessage): string {
     .join("");
 }
 
-export default function ChatStreamPage() {
+export default function LangSmithChatPage() {
   const [modelId, setModelId] = useState(MODELS[0].id);
   const [inputValue, setInputValue] = useState("");
   const [evaluations, setEvaluations] = useState<Record<string, EvalState>>({});
 
-  // Keep a ref so the transport body callback always sees the current modelId
+  // Maps assistant messageId -> langsmith run ID captured from response headers
+  const messageRunIdsRef = useRef<Record<string, string>>({});
+  // Stores the run ID from the most recently initiated stream
+  const pendingRunIdRef = useRef<string | undefined>(undefined);
+
   const modelIdRef = useRef(modelId);
   modelIdRef.current = modelId;
 
   const transport = useMemo(
     () =>
       new DefaultChatTransport({
-        api: "/api/stream",
+        api: "/api/langsmith/stream",
         body: () => ({ modelId: modelIdRef.current }),
+        fetch: async (input, init) => {
+          const response = await fetch(input, init);
+          const runId = response.headers.get("x-langsmith-run-id");
+          if (runId) {
+            pendingRunIdRef.current = runId;
+          }
+          return response;
+        },
       }),
     [],
   );
@@ -47,6 +60,17 @@ export default function ChatStreamPage() {
   const { messages, sendMessage, stop, status, error } = useChat({ transport });
 
   const isLoading = status === "submitted" || status === "streaming";
+
+  // When streaming finishes, associate the pending run ID with the latest assistant message
+  useEffect(() => {
+    if (status === "ready" && pendingRunIdRef.current) {
+      const lastAssistant = [...messages].reverse().find((m) => m.role === "assistant");
+      if (lastAssistant && !messageRunIdsRef.current[lastAssistant.id]) {
+        messageRunIdsRef.current[lastAssistant.id] = pendingRunIdRef.current;
+        pendingRunIdRef.current = undefined;
+      }
+    }
+  }, [status, messages]);
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -57,11 +81,12 @@ export default function ChatStreamPage() {
 
   async function evaluate(messageId: string, prompt: string, response: string) {
     setEvaluations((prev) => ({ ...prev, [messageId]: { status: "loading" } }));
+    const runId = messageRunIdsRef.current[messageId];
     try {
-      const res = await fetch("/api/evaluate", {
+      const res = await fetch("/api/langsmith/evaluate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt, response, modelId }),
+        body: JSON.stringify({ prompt, response, modelId, runId }),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const result: EvaluationResult = await res.json();
@@ -92,7 +117,7 @@ export default function ChatStreamPage() {
 
       {/* Page heading */}
       <h1 className="text-2xl font-semibold text-zinc-900 dark:text-zinc-100 mb-6">
-        AI SDK Structured Output Evaluation
+        LangSmith Traced Evaluation
       </h1>
 
       {/* Model selector */}
@@ -134,7 +159,6 @@ export default function ChatStreamPage() {
             evaluations[message.id] ?? { status: "idle" };
           const responseText = getMessageText(message);
 
-          // Find the user prompt that preceded this assistant message
           const precedingUserMessage = !isUser
             ? messages.slice(0, index).findLast((m) => m.role === "user")
             : null;
@@ -221,6 +245,18 @@ export default function ChatStreamPage() {
                             {evalState.result.weaknesses}
                           </span>
                         </div>
+                        {evalState.result.langsmithUrl && (
+                          <div className="pt-1 border-t border-zinc-100 dark:border-zinc-800">
+                            <a
+                              href={evalState.result.langsmithUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 text-xs text-blue-500 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                            >
+                              View in LangSmith ↗
+                            </a>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
