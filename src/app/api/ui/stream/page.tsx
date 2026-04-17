@@ -3,6 +3,7 @@
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, UIMessage } from "ai";
 import { useState, useRef, useMemo } from "react";
+import Link from "next/link";
 import { MODELS } from "@/lib/models";
 
 interface EvaluationResult {
@@ -81,6 +82,19 @@ export default function ChatStreamPage() {
 
   return (
     <div className="flex flex-col w-full max-w-2xl py-8 pb-32 mx-auto stretch">
+      {/* Back link */}
+      <Link
+        href="/"
+        className="mb-4 self-start text-sm text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 transition-colors"
+      >
+        ← Back to Home
+      </Link>
+
+      {/* Page heading */}
+      <h1 className="text-2xl font-semibold text-zinc-900 dark:text-zinc-100 mb-6">
+        AI SDK Structured Output Evaluation
+      </h1>
+
       {/* Model selector */}
       <div className="mb-6 flex items-center gap-3">
         <label className="text-sm font-medium text-zinc-600 dark:text-zinc-400 whitespace-nowrap">
