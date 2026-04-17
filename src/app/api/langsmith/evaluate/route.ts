@@ -48,8 +48,8 @@ export async function POST(req: Request) {
 
             try {
                 langsmithUrl = await client.getRunUrl({ runId });
-            } catch {
-                // URL construction is best-effort; don't fail the request
+            } catch (error) {
+                console.warn("Could not retrieve LangSmith run URL:", error);
             }
         }
 
